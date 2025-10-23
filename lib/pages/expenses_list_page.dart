@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import 'expense_add_page.dart';
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 class ExpensesListPage extends StatefulWidget {
   const ExpensesListPage({super.key});
@@ -22,15 +24,37 @@ class _ExpensesListPageState extends State<ExpensesListPage> {
   }
 
   Future<void> _initDb() async {
-    _database = await openDatabase(
-      join(await getDatabasesPath(), 'expenses.db'),
-      onCreate: (db, version) {
-        return db.execute(
-          'CREATE TABLE expenses(id INTEGER PRIMARY KEY, name TEXT, date TEXT, amount REAL)',
-        );
-      },
-      version: 1,
-    );
+    final dbPath = await getDatabasesPath();
+    final path = join(dbPath, 'expenses.db');
+
+    if (Platform.isWindows) {
+      sqfliteFfiInit();
+      final databaseFactory = databaseFactoryFfi;
+      final documentsDirectory = await getApplicationSupportDirectory();
+      final path = join(documentsDirectory.path, 'expenses.db');
+      _database = await databaseFactory.openDatabase(
+        path,
+        options: OpenDatabaseOptions(
+          onCreate: (db, version) {
+            return db.execute(
+              'CREATE TABLE expenses(id INTEGER PRIMARY KEY, name TEXT, date TEXT, amount REAL)',
+            );
+          },
+          version: 1,
+        ),
+      );
+    } else {
+      _database = await openDatabase(
+        path,
+        onCreate: (db, version) {
+          return db.execute(
+            'CREATE TABLE expenses(id INTEGER PRIMARY KEY, name TEXT, date TEXT, amount REAL)',
+          );
+        },
+        version: 1,
+      );
+    }
+
     _fetchExpenses();
   }
 
@@ -202,9 +226,9 @@ class _ExpensesListPageState extends State<ExpensesListPage> {
               _fetchExpenses();
             },
             backgroundColor: Colors.deepPurple,
-            child: const Icon(Icons.add, color: Colors.white),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             elevation: 4,
+            child: const Icon(Icons.add, color: Colors.white),
           ),
         ),
       ),
